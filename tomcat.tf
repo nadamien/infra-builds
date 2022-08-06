@@ -149,17 +149,17 @@ resource "null_resource" "copyfiles" {
     }
   
   provisioner "file" {
-    source      = "/Users/pasindu/ci-cd/main-proj/conf-tc/context_updated_meta.xml"
+    source      = "./conf-tc/context_updated_meta.xml"
     destination = "/tmp/context_updated_meta.xml"
   }
 
     provisioner "file" {
-    source      = "/Users/pasindu/ci-cd/main-proj/conf-tc/context_updated.xml"
+    source      = "./conf-tc/context_updated.xml"
     destination = "/tmp/context_updated.xml"
   }
 
     provisioner "file" {
-    source      = "/Users/pasindu/ci-cd/main-proj/conf-tc/tomcat-users_updated.xml"
+    source      = "./conf-tc/tomcat-users_updated.xml"
     destination = "/tmp/tomcat-users_updated.xml"
   }
   
