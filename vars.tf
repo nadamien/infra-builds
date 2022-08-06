@@ -24,9 +24,7 @@ variable "secret_key" {
 }
 
 
-variable "vpc_cidr_block" {
-  description = "VPC CIDR"
-  default = "10.0.1.0/24"
-}
-
-
+# variable "vpc_cidr_block" {
+#   description = "VPC CIDR"
+#   default = "10.0.1.0/24"
+# }

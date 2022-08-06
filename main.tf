@@ -50,7 +50,7 @@ resource "aws_route_table_association" "a" {
 }
 
 resource "aws_security_group" "allow_web" {
-  name        = "allow_web_traffice"
+  name        = "allow_traffic_jenkins"
   description = "Allow web traffic"
   vpc_id      = "${aws_vpc.jenkins-vpc.id}"
 
@@ -78,7 +78,7 @@ resource "aws_security_group" "allow_web" {
   }
 
   tags = {
-    Name = "allow_web_traffic"
+    Name = "allow_traffic_jenkins"
   }
 }
 

@@ -1,31 +1,25 @@
-provider "aws" {
-    access_key  = "${var.access_key}"
-    secret_key  = "${var.secret_key}"
-    region      = "${var.aws_region}"
-}
-
 resource "aws_vpc" "tomcat-vpc" {
-  cidr_block = "10.0.1.0/24"
+  cidr_block = "10.0.2.0/24"
   tags = {
-      Name = "Tomcat-Server-Load"
+      Name = "Tomcat-Server-Connect"
   }
 }
 
-resource "aws_internet_gateway" "public-gw" {
+resource "aws_internet_gateway" "public-gw-tomcat" {
   vpc_id = "${aws_vpc.tomcat-vpc.id}"
 }
 
-resource "aws_route_table" "pre-prod-route-table" {
+resource "aws_route_table" "route-for-tomcat" {
   vpc_id = "${aws_vpc.tomcat-vpc.id}"
 
   route {
     cidr_block = "0.0.0.0/0" #default route
-    gateway_id = "${aws_internet_gateway.public-gw.id}"
+    gateway_id = "${aws_internet_gateway.public-gw-tomcat.id}"
   }
 
   route {
     ipv6_cidr_block        = "::/0"
-    gateway_id             = "${aws_internet_gateway.public-gw.id}"
+    gateway_id             = "${aws_internet_gateway.public-gw-tomcat.id}"
   }
     tags = {
       Name ="Tomcat-Route-Table"
@@ -34,7 +28,7 @@ resource "aws_route_table" "pre-prod-route-table" {
 
 resource "aws_subnet" "tomcat-subnet" {
   vpc_id     = "${aws_vpc.tomcat-vpc.id}"
-  cidr_block = "10.0.1.0/24"
+  cidr_block = "10.0.2.0/24"
   availability_zone = "us-east-1a"
 
   tags = {
@@ -44,13 +38,13 @@ resource "aws_subnet" "tomcat-subnet" {
 
 # 5 . Associate subnet with route Table
 
-resource "aws_route_table_association" "a" {
+resource "aws_route_table_association" "b" {
   subnet_id      = aws_subnet.tomcat-subnet.id
-  route_table_id = aws_route_table.pre-prod-route-table.id
+  route_table_id = aws_route_table.route-for-tomcat.id
 }
 
 resource "aws_security_group" "devops-sec-group" {
-  name        = "allow_web_traffice"
+  name        = "devops-sec-group"
   description = "Allow web traffic"
   vpc_id      = "${aws_vpc.tomcat-vpc.id}"
 
@@ -78,22 +72,22 @@ resource "aws_security_group" "devops-sec-group" {
   }
 
   tags = {
-    Name = "allow_web_traffic"
+    Name = "devops-sec-group"
   }
 }
 
-resource "aws_network_interface" "web-server-nic" {
+resource "aws_network_interface" "tomcat-nic" {
   subnet_id       = "${aws_subnet.tomcat-subnet.id}"
-  private_ips     = ["10.0.1.50"]
+  private_ips     = ["10.0.2.60"]
   security_groups = ["${aws_security_group.devops-sec-group.id}"]
 }
 
 ##depends on the internet gateway
-resource "aws_eip" "one" {
+resource "aws_eip" "two" {
   vpc                       = true
-  network_interface         = "${aws_network_interface.web-server-nic.id}"
-  associate_with_private_ip = "10.0.1.50"
-  depends_on = [aws_internet_gateway.public-gw]
+  network_interface         = "${aws_network_interface.tomcat-nic.id}"
+  associate_with_private_ip = "10.0.2.60"
+  depends_on = [aws_internet_gateway.public-gw-tomcat]
 }
 
 resource "aws_instance" "tomcatserver-main" {
@@ -104,7 +98,7 @@ resource "aws_instance" "tomcatserver-main" {
 
     network_interface {
       device_index = 0
-      network_interface_id =  "${aws_network_interface.web-server-nic.id}"
+      network_interface_id =  "${aws_network_interface.tomcat-nic.id}"
     }
 
     user_data = <<-EOF
@@ -118,9 +112,23 @@ resource "aws_instance" "tomcatserver-main" {
                 sudo wget https://dlcdn.apache.org/tomcat/tomcat-9/v9.0.65/bin/apache-tomcat-9.0.65.tar.gz
                 sudo tar -xvzf apache-tomcat-9.0.65.tar.gz
                 sudo mv "apache-tomcat-9.0.65" tomcat
-                cd /opt/tomcat/bin
-                sudo ./startup.sh
-                ps -ef | grep tomcat > /root/tomcat_start.log
+                chmod +x /opt/tomcat/bin/startup.sh
+                chmod +x /opt/tomcat/bin/shutdown.sh
+                ##create softlinks for up/down
+                ln -s /opt/tomcat/bin/startup.sh /usr/local/bin/tomcatup
+                ln -s /opt/tomcat/bin/shutdown.sh /usr/local/bin/tomcatdown
+                ##tomcat softlink test
+                tomcatup > /root/tomcat_start_stop.log && ps -ef | grep tomcat >> /root/tomcat_start_stop.log
+                tomcatdown > /root/tomcat_start_stop.log && ps -ef | grep tomcat >> /root/tomcat_start_stop.log
+                tomcatup > /root/tomcat_start.log && ps -ef | grep tomcat >> /root/tomcat_start.log
+
+                sudo mv /tmp/context_updated.xml /opt/tomcat/webapps/host-manager/META-INF/context.xml
+                sudo mv /tmp/context_updated_meta.xml /opt/tomcat/webapps/manager/META-INF/context.xml
+                sudo mv /tmp/tomcat-users_updated.xml /opt/tomcat/conf/tomcat-users.xml
+
+                tomcatdown > /root/tomcat_start_stop.log && ps -ef | grep tomcat >> /root/tomcat_start_stop.log
+                tomcatup > /root/tomcat_start.log && ps -ef | grep tomcat >> /root/tomcat_start.log
+
                 EOF
     tags = {
 
@@ -129,6 +137,35 @@ resource "aws_instance" "tomcatserver-main" {
         Name = "Tomcat-Server-Nera"
     }
 }
+
+
+resource "null_resource" "copyfiles" {
+  
+    connection {
+    type = "ssh"
+    host = aws_instance.tomcatserver-main.public_ip
+    user = "ec2-user"
+    private_key = file("JenkinAccess.pem")
+    }
+  
+  provisioner "file" {
+    source      = "/Users/pasindu/ci-cd/main-proj/conf-tc/context_updated_meta.xml"
+    destination = "/tmp/context_updated_meta.xml"
+  }
+
+    provisioner "file" {
+    source      = "/Users/pasindu/ci-cd/main-proj/conf-tc/context_updated.xml"
+    destination = "/tmp/context_updated.xml"
+  }
+
+    provisioner "file" {
+    source      = "/Users/pasindu/ci-cd/main-proj/conf-tc/tomcat-users_updated.xml"
+    destination = "/tmp/tomcat-users_updated.xml"
+  }
+  
+  depends_on = [ aws_instance.tomcatserver-main ]
+  
+  }
 
 
 
