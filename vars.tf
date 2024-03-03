@@ -5,22 +5,22 @@ variable "aws_region" {
 # variable "access_key_data" {  
 #   type = map(string)
 #     default ={
-#       access_key = "AKIA22YDYXR6LK5NTKWV"
+#       access_key = "<Acceee Key>"
 #     }  
 # }
 
 # variable "secret_key_data" {  
 #   type = map(string)
 #     default ={
-#       secret_key = "kBsx3ny3Hne9IO8HS1Mz8yaGqK00dr+1tDy3lCNk"
+#       secret_key = "<Security Key"
 #     }  
 # }
 
 variable "access_key" {
-	default = "AKIA22YDYXR6KRCVJVHJ"
+	default = "<Acceee Key>"
 }
 variable "secret_key" {
-	default = "LMAcJoviI2iucg1dWwm5X/D5Gc+7MgoLm3DPimAz"
+	default = "<Security Key>"
 }
 
 
